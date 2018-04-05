@@ -36,42 +36,78 @@ class FetchOffersCommand extends ContainerAwareCommand
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $output->writeln('Advertiser ID: '.$input->getArgument('advertiserId'));
+        $advertiserId = $input->getArgument('advertiserId');
+        $output->writeln('Advertiser ID: '.$advertiserId);
 
+        $doctrine = $this->getContainer()->get('doctrine');
+
+        new FetchOfferXflirtJsonSource($doctrine, 'http://process.xflirt.com/advertiser/'.$advertiserId.'/offers');
+         
+    }
+}
+
+class FetchOfferXflirtJsonSource {
+    private $json_data;
+    private $entriesNumber;
+
+    function __construct($doctrine, $url) {
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, 'http://process.xflirt.com/advertiser/'.$input->getArgument('advertiserId').'/offers');
+        curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-type: application/json')); // Assuming you're requesting JSON
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 
         $response = curl_exec($ch);
 
         $data = json_decode($response);
-        $doctrine = $this->getContainer()->get('doctrine');
-        $em = $doctrine->getEntityManager();
+        $this->json_data = $data;
+        $this->save($doctrine);
+    }
 
-        for($i=1;$i<=count((array)$data);$i++) {
-            if(isset($data->{1}->payout_amount)){
-                if(!$doctrine->getRepository('AppBundle:Offer')->findOneBy(array('country' => $data->{$i}->countries[0], 'payout' => $data->{$i}->payout_amount, 'name' => $data->{$i}->name, 'platform' => $data->{$i}->mobile_platform))) {
+    public function getJsonData(){
+        $newArray = array();
 
-                    $offer = new Offer();
-                    $offer->setCountry($data->{$i}->countries[0]);
-                    $offer->setPayout($data->{$i}->payout_amount);
-                    $offer->setName($data->{$i}->name);
-                    $offer->setPlatform($data->{$i}->mobile_platform);
-                    $em->persist($offer);
-                    $em->flush();
-                }
-            } elseif(isset($data->{1}->campaigns->points)) {
-                if(!$doctrine->getRepository('AppBundle:Offer')->findOneBy(array('country' => $data->{$i}->campaigns->countries[0], 'payout' => $data->{$i}->campaigns->points*0.001, 'name' => $data->{$i}->app_details->developer, 'platform' => $data->{$i}->app_details->platform))) {
-                    $offer = new Offer();
-                    $offer->setCountry($data->{$i}->campaigns->countries[0]);
-                    $offer->setPayout($data->{$i}->campaigns->points*0.001);
-                    $offer->setName($data->{$i}->app_details->developer);
-                    $offer->setPlatform($data->{$i}->app_details->platform);
-                    $em->persist($offer);
-                    $em->flush();
-                }
-            } 
+        for($i=1;$i<=$this->getEntriesNumber();$i++) {
+            if(isset($this->json_data->{1}->payout_amount)){
+                array_push($newArray,
+                    [
+                        $this->json_data->{$i}->countries[0],
+                        $this->json_data->{$i}->payout_amount,
+                        $this->json_data->{$i}->name,
+                        $this->json_data->{$i}->mobile_platform]);
+            } elseif(isset($this->json_data->{1}->campaigns->points)) {
+                array_push($newArray, 
+                    [
+                        $this->json_data->{$i}->campaigns->countries[0],
+                        $this->json_data->{$i}->campaigns->points*0.001,
+                        $this->json_data->{$i}->app_details->developer,
+                        $this->json_data->{$i}->app_details->platform
+                    ]
+                );
+            }
         }
+        return $newArray;
+    }
+
+    public function getEntriesNumber(){
+        return count((array)$this->json_data);
+    }
+
+    private function save($doctrine){
+        $em = $doctrine->getEntityManager();
+        
+        $array = $this->getJsonData();
+
+        foreach ($array as $value) {
+            if(!$doctrine->getRepository('AppBundle:Offer')->findOneBy(array('country' => $value[0], 'payout' => $value[1], 'name' => $value[2], 'platform' => $value[3]))) {
+                $offer = new Offer();
+                $offer->setCountry($value[0]);
+                $offer->setPayout($value[1]);
+                $offer->setName($value[2]);
+                $offer->setPlatform($value[3]);
+
+                $em->persist($offer);
+                $em->flush();
+            }
+        } 
     }
 }
