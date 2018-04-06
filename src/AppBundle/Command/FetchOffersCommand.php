@@ -91,8 +91,6 @@ class FetchOfferXflirtJsonSource {
         return $newArray;
     }
 
-    public function setUrl($advertiserId){
-    }
     public function getEntriesNumber(){
         return count((array)$this->json_data);
     }
