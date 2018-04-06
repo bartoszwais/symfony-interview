@@ -41,7 +41,7 @@ class FetchOffersCommand extends ContainerAwareCommand
 
         $doctrine = $this->getContainer()->get('doctrine');
 
-        new FetchOfferXflirtJsonSource($doctrine, 'http://process.xflirt.com/advertiser/'.$advertiserId.'/offers');
+        new FetchOfferXflirtJsonSource($doctrine, $advertiserId);
          
     }
 }
@@ -50,7 +50,10 @@ class FetchOfferXflirtJsonSource {
     private $json_data;
     private $entriesNumber;
 
-    function __construct($doctrine, $url) {
+    function __construct($doctrine, $advertiserId) {
+
+        $url = 'http://process.xflirt.com/advertiser/'.$advertiserId.'/offers';
+
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-type: application/json')); // Assuming you're requesting JSON
@@ -88,6 +91,8 @@ class FetchOfferXflirtJsonSource {
         return $newArray;
     }
 
+    public function setUrl($advertiserId){
+    }
     public function getEntriesNumber(){
         return count((array)$this->json_data);
     }
