@@ -8,6 +8,7 @@ use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputArgument;
+use GuzzleHttp\Client;
 
 
 class FetchOffersCommand extends ContainerAwareCommand
@@ -53,13 +54,8 @@ class FetchOfferXflirtJsonSource {
     function __construct($doctrine, $advertiserId) {
 
         $url = 'http://process.xflirt.com/advertiser/'.$advertiserId.'/offers';
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-type: application/json')); // Assuming you're requesting JSON
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-
-        $response = curl_exec($ch);
+        $client = new Client();
+        $response = $client->get($url)->getBody()->getContents();
 
         $data = json_decode($response);
         $this->json_data = $data;
